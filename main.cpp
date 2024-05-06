@@ -10,7 +10,7 @@
 
 const int KERNEL_RADIUS = 8;
 const float sigma = 3.f;
-/*тесттест*/
+
 unsigned char blur(int x, int y, int channel, unsigned char* input, int width, int height)
 {
 	float sum_weight = 0.0f;
