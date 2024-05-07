@@ -159,6 +159,51 @@ void gaussian_blur_separate_serial(const char* filename)
 	delete[] img_out;
 }
 
+void gaussian_blur_parallel(const char* filename)
+{
+	int width = 0;
+	int height = 0;
+	int img_orig_channels = 4;
+	// Load an image into an array of unsigned chars that is the size of [width * height * number of channels]. The channels are the Red, Green, Blue and Alpha channels of the image.
+	unsigned char* img_in = stbi_load(filename, &width, &height, &img_orig_channels /*image file channels*/, 4 /*requested channels*/);
+	if (img_in == nullptr)
+	{
+		printf("Could not load %s\n", filename);
+		return;
+	}
+
+	unsigned char* img_out = new unsigned char[width * height * 4];
+
+	// Timer to measure performance
+	auto start = std::chrono::high_resolution_clock::now();
+
+	// Perform Gaussian Blur to each pixel
+	for (int y = 0; y < height; y++)
+	{
+		for (int x = 0; x < width; x++)
+		{
+			int pixel = y * width + x;
+			for (int channel = 0; channel < 4; channel++)
+			{
+				img_out[4 * pixel + channel] = blur(x, y, channel, img_in, width, height);
+			}
+		}
+	}
+
+	// Timer to measure performance
+	auto end = std::chrono::high_resolution_clock::now();
+	// Computation time in milliseconds
+	int time = (int)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+	printf("Gaussian Blur - Parallel: Time %dms\n", time);
+
+	// Write the blurred image into a JPG file
+	stbi_write_jpg("blurred_image_parallel.jpg", width, height, 4, img_out, 90 /*quality*/);
+
+	stbi_image_free(img_in);
+	delete[] img_out;
+	
+}
+
 int main()
 {
 	const char* filename = "garden.jpg";
