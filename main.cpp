@@ -1,6 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <iostream>
 #include <chrono>
+#include <pthread>;
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -159,25 +160,11 @@ void gaussian_blur_separate_serial(const char* filename)
 	delete[] img_out;
 }
 
-void gaussian_blur_parallel(const char* filename)
-{
-	int width = 0;
-	int height = 0;
-	int img_orig_channels = 4;
-	// Load an image into an array of unsigned chars that is the size of [width * height * number of channels]. The channels are the Red, Green, Blue and Alpha channels of the image.
-	unsigned char* img_in = stbi_load(filename, &width, &height, &img_orig_channels /*image file channels*/, 4 /*requested channels*/);
-	if (img_in == nullptr)
-	{
-		printf("Could not load %s\n", filename);
-		return;
-	}
+void *parallel_func(void *ptr) {
 
-	unsigned char* img_out = new unsigned char[width * height * 4];
+	struct image_info* my_image_info = ptr;
 
-	// Timer to measure performance
-	auto start = std::chrono::high_resolution_clock::now();
-
-	// Perform Gaussian Blur to each pixel
+	// Perform Gaussian Blur to each pixel within this thread's limits
 	for (int y = 0; y < height; y++)
 	{
 		for (int x = 0; x < width; x++)
@@ -190,6 +177,37 @@ void gaussian_blur_parallel(const char* filename)
 		}
 	}
 
+}
+
+void gaussian_blur_parallel(const char* filename,const int thread_count /* Number of threads to run */)
+{
+	pthread_t tids[5];
+
+	struct  { 
+		unsigned char* img_in;
+		unsigned char* img_out;
+		int width = 0; 
+		int height = 0; 
+		int channels = 4; 
+	} image_info;
+
+
+	// Load an image into an array of unsigned chars that is the size of [width * height * number of channels]. The channels are the Red, Green, Blue and Alpha channels of the image.
+	image_info.img_in = stbi_load(filename, &image_info.width, &image_info.height, &image_info.channels /*image file channels*/, 4 /*requested channels*/);
+	if (image_info.img_in == nullptr)
+	{
+		printf("Could not load %s\n", filename);
+		return;
+	}
+
+	image_info.img_out = new unsigned char[image_info.width * image_info.height * 4];
+
+	// Timer to measure performance
+	auto start = std::chrono::high_resolution_clock::now();
+
+	for (int i = 0; i < 5; i++)
+		pthread_create(&tids[i], NULL, thrfunc, (void*)i);
+
 	// Timer to measure performance
 	auto end = std::chrono::high_resolution_clock::now();
 	// Computation time in milliseconds
@@ -197,10 +215,10 @@ void gaussian_blur_parallel(const char* filename)
 	printf("Gaussian Blur - Parallel: Time %dms\n", time);
 
 	// Write the blurred image into a JPG file
-	stbi_write_jpg("blurred_image_parallel.jpg", width, height, 4, img_out, 90 /*quality*/);
+	stbi_write_jpg("blurred_image_parallel.jpg", image_info.width, image_info.height, 4, image_info.img_out, 90 /*quality*/);
 
-	stbi_image_free(img_in);
-	delete[] img_out;
+	stbi_image_free(image_info.img_in);
+	delete[] image_info.img_out;
 	
 }
 
