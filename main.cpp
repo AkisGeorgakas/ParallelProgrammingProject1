@@ -183,30 +183,37 @@ void gaussian_blur_parallel(const char* filename,const int thread_count /* Numbe
 {
 	pthread_t tids[5];
 
-	struct  { 
+	struct image_info { 
 		unsigned char* img_in;
 		unsigned char* img_out;
 		int width = 0; 
 		int height = 0; 
 		int channels = 4; 
-	} image_info;
+	} image;
 
 
 	// Load an image into an array of unsigned chars that is the size of [width * height * number of channels]. The channels are the Red, Green, Blue and Alpha channels of the image.
-	image_info.img_in = stbi_load(filename, &image_info.width, &image_info.height, &image_info.channels /*image file channels*/, 4 /*requested channels*/);
-	if (image_info.img_in == nullptr)
+	image.img_in = stbi_load(filename, &image.width, &image.height, &image.channels /*image file channels*/, 4 /*requested channels*/);
+	if (image.img_in == nullptr)
 	{
 		printf("Could not load %s\n", filename);
 		return;
 	}
 
-	image_info.img_out = new unsigned char[image_info.width * image_info.height * 4];
+	image.img_out = new unsigned char[image.width * image.height * 4];
 
 	// Timer to measure performance
 	auto start = std::chrono::high_resolution_clock::now();
 
+	
+
 	for (int i = 0; i < 5; i++)
-		pthread_create(&tids[i], NULL, thrfunc, (void*)i);
+
+		struct thread_data { 
+			image_info image = image;
+			int start = ;
+		} data;
+		pthread_create(&tids[i], NULL, thrfunc, (void*) thread_data);
 
 	// Timer to measure performance
 	auto end = std::chrono::high_resolution_clock::now();
@@ -215,10 +222,10 @@ void gaussian_blur_parallel(const char* filename,const int thread_count /* Numbe
 	printf("Gaussian Blur - Parallel: Time %dms\n", time);
 
 	// Write the blurred image into a JPG file
-	stbi_write_jpg("blurred_image_parallel.jpg", image_info.width, image_info.height, 4, image_info.img_out, 90 /*quality*/);
+	stbi_write_jpg("blurred_image_parallel.jpg", image.width, image.height, 4, image.img_out, 90 /*quality*/);
 
-	stbi_image_free(image_info.img_in);
-	delete[] image_info.img_out;
+	stbi_image_free(image.img_in);
+	delete[] image.img_out;
 	
 }
 
