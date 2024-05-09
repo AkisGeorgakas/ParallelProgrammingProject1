@@ -205,16 +205,23 @@ void gaussian_blur_parallel(const char* filename,const int thread_count /* Numbe
 	// Timer to measure performance
 	auto start = std::chrono::high_resolution_clock::now();
 
-	
+	int rows_remainder = image.height % thread_count;
+	int rows_quotient = image.height / thread_count;
+	int current_thread_rows = (rows_quotient) + 1;
 
-	for (int i = 0; i < 5; i++)
+	for (int i = 0; i < 5; i++) {
 
-		struct thread_data { 
+		if (i = rows_remainder) { current_thread_rows--; }
+
+		int start_row = (rows_quotient * i) + 1;//TODO
+
+		struct thread_data {
 			image_info image = image;
-			int start = ;
+			int start_row = start_row;
 		} data;
-		pthread_create(&tids[i], NULL, thrfunc, (void*) thread_data);
 
+		pthread_create(&tids[i], NULL, thrfunc, (void*)thread_data);
+	}
 	// Timer to measure performance
 	auto end = std::chrono::high_resolution_clock::now();
 	// Computation time in milliseconds
