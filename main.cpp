@@ -208,12 +208,14 @@ void gaussian_blur_parallel(const char* filename,const int thread_count /* Numbe
 	int rows_remainder = image.height % thread_count;
 	int rows_quotient = image.height / thread_count;
 	int current_thread_rows = (rows_quotient) + 1;
+	int offset = 0;
 
 	for (int i = 0; i < 5; i++) {
 
 		if (i = rows_remainder) { current_thread_rows--; }
+		
 
-		int start_row = (rows_quotient * i) + 1;//TODO
+		int start_row = (rows_quotient * i) + offset; //Calculate the start of this thread's area. Offset accounts for the extra rows appointed to previous threads
 
 		struct thread_data {
 			image_info image = image;
@@ -221,6 +223,8 @@ void gaussian_blur_parallel(const char* filename,const int thread_count /* Numbe
 		} data;
 
 		pthread_create(&tids[i], NULL, thrfunc, (void*)thread_data);
+
+		if (offset < rows_remainder) { offset++; }
 	}
 	// Timer to measure performance
 	auto end = std::chrono::high_resolution_clock::now();
