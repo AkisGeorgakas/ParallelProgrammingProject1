@@ -162,9 +162,9 @@ void gaussian_blur_separate_serial(const char* filename)
 }
 
 
-void *parallel_func(int start_row, int end_row, int channels, unsigned char& img_in, unsigned char& img_out) {
+void parallel_func(int start_row, int end_row, int channels, unsigned char& img_in, unsigned char& img_out) {
 
-	printf("Thread Created");
+	printf("Thread Created with starting row"+ start_row);
 
 	// Perform Gaussian Blur to each pixel within this thread's limits
 	/*
@@ -180,6 +180,7 @@ void *parallel_func(int start_row, int end_row, int channels, unsigned char& img
 		}
 	}
 	*/
+	printf("Thread Ended with ending row" + end_row);
 }
 
 void gaussian_blur_parallel(const char* filename,const int thread_count /* Number of threads to run */)
@@ -207,6 +208,9 @@ void gaussian_blur_parallel(const char* filename,const int thread_count /* Numbe
 	int rows_quotient = height / thread_count;
 	int current_thread_rows = (rows_quotient) + 1;
 	int offset = 0;
+	int start_row = 0;
+	int end_row = 0;
+	
 	std::vector<std::thread> threads;
 
 	for (int i = 0; i < thread_count; i++) {
@@ -215,11 +219,11 @@ void gaussian_blur_parallel(const char* filename,const int thread_count /* Numbe
 		
 
 
-		int start_row = (rows_quotient * i) + offset; //Calculate the start of this thread's area. Offset accounts for the extra rows appointed to previous threads. 
-		int end_row = start_row + current_thread_rows;
+		start_row = (rows_quotient * i) + offset; //Calculate the start of this thread's area. Offset accounts for the extra rows appointed to previous threads. 
+		end_row = start_row + current_thread_rows;
 
-		int height = 0;
-		threads[i] = std::thread(parallel_func, start_row, end_row, channels, std::ref(img_in), std::ref(img_out));
+		
+		threads[i] = std::thread(parallel_func,start_row,end_row, channels, std::ref(img_in), std::ref(img_out));
 
 		
 
@@ -251,14 +255,14 @@ void gaussian_blur_parallel(const char* filename,const int thread_count /* Numbe
 int main()
 {
 	const char* filename = "garden.jpg";
-	gaussian_blur_serial(filename);
+	//gaussian_blur_serial(filename);
 
-	// gaussian_blur_parallel(filename);
+	gaussian_blur_parallel(filename,4);
 
 
 
-	const char* filename2 = "street_night.jpg";
-	gaussian_blur_separate_serial(filename2);
+	//const char* filename2 = "street_night.jpg";
+	//gaussian_blur_separate_serial(filename2);
 
 	// gaussian_blur_separate_parallel(filename2);
 
