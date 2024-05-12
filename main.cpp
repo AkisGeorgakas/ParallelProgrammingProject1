@@ -60,7 +60,7 @@ unsigned char blurAxis(int x, int y, int channel, int axis/*0: horizontal axis, 
 	return (unsigned char)std::max(std::min(ret, 255.f), 0.f);
 }
 
-void gaussian_blur_serial(const char* filename)
+int gaussian_blur_serial(const char* filename)
 {
 	int width = 0;
 	int height = 0;
@@ -70,7 +70,7 @@ void gaussian_blur_serial(const char* filename)
 	if (img_in == nullptr)
 	{
 		printf("Could not load %s\n", filename);
-		return;
+		return 0;
 	}
 
 	unsigned char* img_out = new unsigned char[width * height * 4];
@@ -95,13 +95,14 @@ void gaussian_blur_serial(const char* filename)
 	auto end = std::chrono::high_resolution_clock::now();
 	// Computation time in milliseconds
 	int time = (int)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-	printf("Gaussian Blur - Serial: Time %dms\n", time);
+	//printf("Gaussian Blur - Serial: Time %dms\n", time);
 
 	// Write the blurred image into a JPG file
-	stbi_write_jpg("blurred_image_serial.jpg", width, height, 4, img_out, 90 /*quality*/);
+	//stbi_write_jpg("blurred_image_serial.jpg", width, height, 4, img_out, 90 /*quality*/);
 
 	stbi_image_free(img_in);
 	delete[] img_out;
+	return time;
 }
 
 void gaussian_blur_separate_serial(const char* filename)
@@ -162,13 +163,14 @@ void gaussian_blur_separate_serial(const char* filename)
 }
 
 
-void parallel_func(int start_row, int end_row, int channels, unsigned char& img_in, unsigned char& img_out) {
-
-	printf("Thread Created with starting row"+ start_row);
+void parallel_func(int start_row, int end_row, int width, int height, int channels, unsigned char* img_in, unsigned char* img_out) {
+	
+	//std::printf("Thread Created with starting row: %d %s", start_row, "\n");
+	unsigned char* img_out_pointer = img_out;
 
 	// Perform Gaussian Blur to each pixel within this thread's limits
-	/*
-	for (int y = 0; y < height; y++)
+	// Note that the start_row is actually included in this thread's area. However, the end_row is not and the counter stops one row before it.
+	for (int y = start_row; y < end_row; y++)
 	{
 		for (int x = 0; x < width; x++)
 		{
@@ -179,29 +181,35 @@ void parallel_func(int start_row, int end_row, int channels, unsigned char& img_
 			}
 		}
 	}
-	*/
-	printf("Thread Ended with ending row" + end_row);
+	
+	//std::cout << "Thread Ended with ending row" << end_row << std::endl;
+	
+
+	//int len = *(&img_in + 1) - img_in;
+	//*(&arr + 1) is the address of the next memory location
+	// just after the last element of the array
+
+	//std::cout << "The length of the array is: " << len << std::endl;
 }
 
-void gaussian_blur_parallel(const char* filename,const int thread_count /* Number of threads to run */)
+int gaussian_blur_parallel(const char* filename,const int thread_count /* Number of threads to run */)
 {
-
+	// Load an image into an array of unsigned chars that is the size of [width * height * number of channels]. The channels are the Red, Green, Blue and Alpha channels of the image.
 	int width = 0; 
 	int height = 0; 
 	int channels = 4; 
 	
-	// Load an image into an array of unsigned chars that is the size of [width * height * number of channels]. The channels are the Red, Green, Blue and Alpha channels of the image.
 	unsigned char* img_in = stbi_load(filename, &width, &height, &channels /*image file channels*/, 4 /*requested channels*/);
 	if (img_in == nullptr)
 	{
 		printf("Could not load %s\n", filename);
-		return;
+		return 0;
 	}
 
 	unsigned char* img_out = new unsigned char[width * height * 4];
 
 
-	// Timer to measure performance
+	// Start timer to measure performance
 	auto start = std::chrono::high_resolution_clock::now();
 
 	int rows_remainder = height % thread_count;
@@ -215,7 +223,7 @@ void gaussian_blur_parallel(const char* filename,const int thread_count /* Numbe
 
 	for (int i = 0; i < thread_count; i++) {
 
-		if (i = rows_remainder) { current_thread_rows--; }
+		if (i == rows_remainder) { current_thread_rows--; }
 		
 
 
@@ -223,44 +231,81 @@ void gaussian_blur_parallel(const char* filename,const int thread_count /* Numbe
 		end_row = start_row + current_thread_rows;
 
 		
-		threads[i] = std::thread(parallel_func,start_row,end_row, channels, std::ref(img_in), std::ref(img_out));
+		threads.push_back(std::thread(parallel_func,start_row, end_row, width, height, channels, *&img_in, *&img_out));
 
 		
 
 		if (offset < rows_remainder) { offset++; }
 	}
-
+	
 	for (int i = 0; i < thread_count; i++) {
 		threads[i].join();
+		//std::cout << "JJoined thread Number:" << i<<std::endl;
 	}
 
 
-	// Timer to measure performance
+	// End timer to measure performance
 	auto end = std::chrono::high_resolution_clock::now();
 	// Computation time in milliseconds
 	int time = (int)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-	printf("Gaussian Blur - Parallel: Time %dms\n", time);
+	//printf("Gaussian Blur - Parallel: Time %dms\n", time);
+	//printf("Just finished running with %d threads\n", thread_count);
 
 	// Write the blurred image into a JPG file
-	stbi_write_jpg("blurred_image_parallel.jpg", width, height, 4, img_out, 90 /*quality*/);
+	//stbi_write_jpg("blurred_image_parallel.jpg", width, height, 4, img_out, 90 /*quality*/);
 
-	for (int i = 0; i < thread_count; i++) {
-		threads[i].detach();
-	}
+	
 	stbi_image_free(img_in);
 	delete[] img_out;
-	
+	return time;
 }
+
+void time_tester_parallel() {
+	
+	int parallel_2_threads = 0 ;
+	int parallel_4_threads = 0 ;
+	int parallel_8_threads = 0 ;
+	int serial_times = 0;
+	
+	const char* filename = "garden.jpg";
+	
+	for (int i = 0; i < 4; i++) {
+		parallel_2_threads += gaussian_blur_parallel(filename, 2);
+	}
+	for (int i = 0; i < 4; i++) {
+		parallel_4_threads += gaussian_blur_parallel(filename, 4);
+	}
+	for (int i = 0; i < 4; i++) {
+		parallel_8_threads += gaussian_blur_parallel(filename, 8);
+	}
+	for (int i = 0; i < 4; i++) {
+		serial_times += gaussian_blur_serial(filename);
+	}
+
+	double avg_2_threads = ((double)parallel_2_threads) / 4;
+	double avg_4_threads = ((double)parallel_4_threads) / 4;
+	double avg_8_threads = ((double)parallel_8_threads) / 4;
+	double avg_serial_times = ((double)serial_times) / 4;
+
+	std::printf("Average run time for 2 threads: %10f ms\n", avg_2_threads);
+	std::printf("Average run time for 4 threads: %10f ms\n", avg_4_threads);
+	std::printf("Average run time for 8 threads: %10f ms\n", avg_8_threads);
+	std::printf("Average serial run time: %10f ms\n", avg_serial_times);
+}
+
+
+
+
 
 int main()
 {
-	const char* filename = "garden.jpg";
+	//const char* filename = "garden.jpg";
 	//gaussian_blur_serial(filename);
 
-	gaussian_blur_parallel(filename,4);
+	//gaussian_blur_parallel(filename,4);
 
-
-
+	//time_tester_parallel();
+	
 	//const char* filename2 = "street_night.jpg";
 	//gaussian_blur_separate_serial(filename2);
 
